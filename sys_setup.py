@@ -92,20 +92,26 @@ def display_grid(order_diction):
                          text=rows[grid_i]).grid(row=grid_i, column=grid_j, sticky='NSEW')
             else:
                 filled_words = str(order_diction[od_index]['order_id']) + '\n' + str(order_diction[od_index]['source']) + \
-                               '\n' + str(order_diction[od_index]['keyword_1'])
+                               '\n' + str(order_diction[od_index]['keyword'])
                 tk.Label(root, bg="white", height=3, width=24, relief='ridge',
                          text=filled_words).grid(row=grid_i, column=grid_j, sticky='NSEW')
                 od_index = od_index + 1
     root.mainloop()
 
 
-def build_diction():
-    part_count = 70
-    diction = {}
-    for diction_index in range(part_count):
-        diction[diction_index] = {'order_id': '0', 'location_placed': False, 'source': None, 'state': None,
-                                  'pair_found': False, 'keyword_1': [], 'top_type': [], 'top_colour': [], 'top_thick': []}
-    return diction
+# create new diction with 7x8 elements
+def build_new_diction(bnd_number):
+    bnd_diction = {}
+    for bnd_i in range(bnd_number):
+        bnd_diction[bnd_i] = {'order_id': '00217',  # default order number returned from server
+                              'placed': False,  # position is occupied
+                              'paired': False,
+                              'source': None,  # internal or external
+                              'state': None,  # status of order
+                              'keyword': [],  # keywords of order
+                              'top_list': []  # cover, content, and colour of top cover
+                              }
+    return bnd_diction
 
 
 def write_csv(wc_csv_path, image_name, csv_orc_words):
@@ -176,59 +182,66 @@ def server_check(sc_order_number, sc_csv_path, sc_tool_path):
     return sc_order_state, sc_data_type, sc_data_colour, sc_data_thick
 
 
-def diction_fill_up(df_diction, df_part_index, df_part_number, df_part_keyword, df_order_flag, df_order_state,
-                    df_order_type, df_order_colour, df_order_thick):
-    df_diction_index = 0
-    print('df_order_flag', df_order_flag)
-    if df_order_flag:
-        for df_diction_index in range(df_part_index + 1):
-            if df_diction[df_diction_index]['order_id'] == df_part_number \
-                    and not df_diction[df_diction_index]['pair_found']:
-                df_diction[df_diction_index]['pair_found'] = True
+# if order id exist, check order id from diction, else, check order keyword
+# if order match in diction, pair parts, else put part in new position
+# return a flag that indicates new internal order paired
+def diction_fill_check(dfc_diction,  # diction to be filled or checked
+                       dfc_order_flag,  # order id exist in server
+                       dfc_placed_index,  # how many order in diction
+                       dfc_part_id,  # order id in number
+                       dfc_part_keyword,  # if order id does not exist, use keyword instead
+                       dfc_order_state,  # status of order
+                       dfc_top_list  # for top cover pairing
+                       ):
+    print('Order exist: ', dfc_order_flag)
+    dfc_order_paired_flag = False
+    dfc_recycle = []
+    dfc_i = 0
 
-                if df_order_state == 'cooling' or df_order_state == 'finishing':
-                    df_diction[df_diction_index]['source'] = ' IN NEW'
-                    print('TWO new internal parts paired at position: ', df_diction_index)
-                else:
-                    df_diction[df_diction_index]['source'] = ' IN USED'
-                    print('TWO used internal parts paired at position: ', df_diction_index)
+    if dfc_order_flag:
+        for dfc_i in range(dfc_placed_index + 1):
+            if dfc_diction[dfc_i]['order_id'] == str(dfc_part_id):
+                dfc_diction[dfc_i]['paired'] = True
+                dfc_order_paired_flag = True
+                print('TWO internal parts paired at position: ', dfc_i)
                 break
-            if df_diction[df_diction_index]['order_id'] != df_part_number \
-                    and not df_diction[df_diction_index]['location_placed'] \
-                    and not df_diction[df_diction_index]['pair_found']:
-                df_diction[df_diction_index]['order_id'] = df_part_number
-                df_diction[df_diction_index]['keyword_1'] = df_part_keyword
-                df_diction[df_diction_index]['location_placed'] = True
-                df_diction[df_diction_index]['state'] = df_order_state
-                df_diction[df_diction_index]['top_type'] = df_order_type
-                df_diction[df_diction_index]['top_colour'] = df_order_colour
-                df_diction[df_diction_index]['top_thick'] = df_order_thick
-
-                if df_order_state == 'cooling' or df_order_state == 'finishing':
-                    df_diction[df_diction_index]['source'] = ' IN NEW'
-                    print('Single new internal parts paired at position: ', df_diction_index)
+            elif dfc_diction[dfc_i]['placed'] is False and dfc_i < dfc_placed_index:
+                dfc_recycle.append(dfc_i)
+            elif dfc_i == dfc_placed_index:
+                if not dfc_recycle:
+                    dfc_j = dfc_i
                 else:
-                    df_diction[df_diction_index]['source'] = ' IN USED'
-                    print('Single used internal parts paired at position: ', df_diction_index)
+                    dfc_j = dfc_recycle[0]
+                dfc_diction[dfc_j]['order_id'] = str(dfc_part_id)
+                dfc_diction[dfc_j]['placed'] = True
+                dfc_diction[dfc_j]['source'] = 'IN'
+                dfc_diction[dfc_j]['keyword'] = dfc_part_keyword
+                dfc_diction[dfc_j]['state'] = dfc_order_state
+                dfc_diction[dfc_j]['top_list'] = dfc_top_list
+                print('Single internal part placed at position: ', dfc_j)
+                dfc_i = dfc_j
                 break
     else:
-        for df_diction_index in range(df_part_index + 1):
-            if df_diction[df_diction_index]['keyword_1'] == df_part_keyword \
-                    and not df_diction[df_diction_index]['pair_found']:
-                df_diction[df_diction_index]['pair_found'] = True
-                df_diction[df_diction_index]['source'] = ' EX'
-                print('TWO external parts paired at position: ', df_diction_index)
+        for dfc_i in range(dfc_placed_index + 1):
+            if dfc_diction[dfc_i]['keyword'] == dfc_part_keyword:
+                dfc_diction[dfc_i]['paired'] = True
+                print('TWO external parts paired at position: ', dfc_i)
                 break
-            if df_diction[df_diction_index]['keyword_1'] != df_part_keyword \
-                    and not df_diction[df_diction_index]['location_placed'] \
-                    and not df_diction[df_diction_index]['pair_found']:
-                df_diction[df_diction_index]['keyword_1'] = df_part_keyword
-                df_diction[df_diction_index]['location_placed'] = True
-                df_diction[df_diction_index]['source'] = 'EX'
-                print('Single external part placed at position: ', df_diction_index)
+            elif dfc_diction[dfc_i]['placed'] is False and dfc_i < dfc_placed_index:
+                dfc_recycle.append(dfc_i)
+            elif dfc_i == dfc_placed_index:
+                if not dfc_recycle:
+                    dfc_j = dfc_i
+                else:
+                    dfc_j = dfc_recycle[0]
+                dfc_diction[dfc_j]['keyword'] = dfc_part_keyword
+                dfc_diction[dfc_j]['placed'] = True
+                dfc_diction[dfc_j]['source'] = 'EX'
+                print('Single external part placed at position: ', dfc_j)
+                dfc_i = dfc_j
                 break
     print("Diction filled")
-    return df_diction, df_diction_index
+    return dfc_diction, dfc_i, dfc_order_paired_flag
 
 
 def display_table(dt_diction):
@@ -265,6 +278,62 @@ def display_table(dt_diction):
     my_tree.pack(pady=5)
     root.mainloop()
 
+
+# if a new internal order part paired, clean the data in diction, recycle the position in diction
+def diction_paired_clean(dpc_diction,  # diction to be edited
+                         dpc_index  # diction index to be cleaned
+                         ):
+    dpc_diction[dpc_index] = {'order_id': '00217',  # default order number returned from server
+                              'placed': False,  # position is occupied
+                              'paired': False,
+                              'source': None,  # internal or external
+                              'state': None,  # status of order
+                              'keyword': [],  # keywords of order
+                              'top_list': []  # cover, content, and colour of top cover
+                              }
+    print('Diction position ' + str(dpc_index) + ' cleaned and recycled')
+    return dpc_diction
+
+
+def check_diction(cd_cover_list, cd_flag):
+    cd_temp = cd_cover_list
+    if cd_flag is True:
+        if cd_temp == ['eva', '2mm', 'black']:
+            cd_code = 100
+        elif cd_temp == ['eva', '3mm', 'black']:
+            cd_code = 101
+        elif cd_temp == ['eva', '2mm', 'blue']:
+            cd_code = 102
+        elif cd_temp == ['eva', '3mm', 'blue']:
+            cd_code = 103
+        elif cd_temp == ['eva', '2mm', 'red']:
+            cd_code = 104
+        elif cd_temp == ['eva', '3mm', 'red']:
+            cd_code = 105
+        elif cd_temp == ['eva', '2mm', 'blu/blk/grn']:
+            cd_code = 106
+        elif cd_temp == ['eva', '3mm', 'blu/blk/grn']:
+            cd_code = 107
+        elif cd_temp == ['eva', '2mm', 'blu/pur/wht']:
+            cd_code = 108
+        elif cd_temp == ['eva', '3mm', 'blu/pur/wht']:
+            cd_code = 109
+        elif cd_temp == ['eva', '2mm', 'red/pur/wht']:
+            cd_code = 110
+        elif cd_temp == ['eva', '3mm', 'red/pur/wht']:
+            cd_code = 111
+        elif cd_temp == ['eva', '2mm', 'yel/blk/gry']:
+            cd_code = 112
+        elif cd_temp == ['eva', '3mm', 'yel/blk/gry']:
+            cd_code = 113
+        elif cd_temp == ['eva', '2mm', 'blu/yel']:
+            cd_code = 114
+        elif cd_temp == ['eva', '3mm', 'blu/yel']:
+            cd_code = 115
+        else:
+            cd_code = 116
+            cd_flag = False
+    return cd_code, cd_flag
 
 if __name__ == '__main__':
     pass

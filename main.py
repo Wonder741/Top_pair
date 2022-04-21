@@ -7,15 +7,15 @@ if __name__ == '__main__':
     # path for google vision setup key
     google_key_path = 'C:/Users/iOrthotics/Desktop/Robot/GoogleVisionAPI/google_apikey.json'
     # path for captured image storage
-    image_store_path = 'C:/Users/iOrthotics/Desktop/Robot/Data/Pics/'
+    image_store_path = 'C:/Users/iOrthotics/Desktop/Demo/Data1/Pics/'
     # path for ocr text storage
-    csv_store_path = 'C:/Users/iOrthotics/Desktop/Robot/Data/image_ocr.csv'
+    csv_store_path = 'C:/Users/iOrthotics/Desktop/Demo/Data1/image_ocr.csv'
     # path for temp data check from server
-    csv_temp_path = 'C:/Users/iOrthotics/Desktop/Robot/Data/order_export.csv'
+    csv_temp_path = 'C:/Users/iOrthotics/Desktop/Demo/Data1/order_export.csv'
     # path for server check tool
     CLI_tool_path = 'C:/Users/iOrthotics/Desktop/Robot/iOrthoticsAPI/roboapi.exe'
     # path for JSON file that keep diction
-    json_diction_path ='C:/Users/iOrthotics/Desktop//Robot/Data/js_diction.json'
+    json_diction_path ='C:/Users/iOrthotics/Desktop/Demo/Data1/js_diction.json'
 
     # camera index and resolution setting
     camera_index = 0
@@ -30,11 +30,11 @@ if __name__ == '__main__':
     Port = 30000
 
     # build a diction for parts placement and pairing
-    pair_diction = sys_setup.build_diction()
+    pair_diction = sys_setup.build_new_diction(57)
 
     # max pairs number
     part_index = 0
-    max_pair_number = 70
+    max_pair_number = 56
     terminate_code = 99
 
     # Input "n" to start new session
@@ -113,10 +113,10 @@ if __name__ == '__main__':
                         order_type = None
                         order_colour = None
                         order_thick = None
+                    order_cover = [order_type, order_thick, order_colour]
                     # fill up and update "pair_diction"
-                    pair_diction, place_position = sys_setup.diction_fill_up(pair_diction, part_index, part_number, part_keyword,
-                                                                   order_id_flag, order_state, order_type, order_colour,
-                                                                   order_thick)
+                    pair_diction, place_position, order_paired_flag = sys_setup.diction_fill_check(pair_diction, order_id_flag, part_index, 
+                                                                                                   part_number, part_keyword, order_state, order_cover)
                     pair_save = [pair_diction, part_index]
                     # save dictionary as JSON file
                     with open(json_diction_path, 'w+') as js_file:
@@ -125,12 +125,19 @@ if __name__ == '__main__':
                     part_index = part_index + 1
 
                     # Avoid exceed pairing space limitation
-                    if place_position > 70:
+                    if place_position > 56:
                         print('Exceed the maximum pair number')
                         conn.send(terminate_code.to_bytes(4, 'big'))
-                    else:
+                        break
+                    elif order_paired_flag is False:
                         print('Place position: ', place_position)
                         conn.send(place_position.to_bytes(4, 'big'))
+                    else:
+                        pair_code = sys_setup.check_diction(order_cover, order_paired_flag)
+                        if order_paired_flag is True:
+                            conn.send(pair_code.to_bytes(4, 'big'))
+                        else:
+                            conn.send(place_position.to_bytes(4, 'big'))
 
                 if data_received == 'part placed':
                     # go back to pick area
